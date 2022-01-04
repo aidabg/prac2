@@ -1,0 +1,818 @@
+---
+title: "Pràctica 2"
+author: "Aida Berenguer"
+output:
+  html_document:
+    df_print: paged
+---
+
+# 1. Descripció del dataset
+
+```{r message=FALSE}
+# Càrrega de les llibreries necessaries
+library(ggplot2)
+library(corrplot)
+library(ggpubr)
+library(factoextra)
+library(cluster)
+```
+
+```{r}
+# Lectura de les dades dels fitxers csv
+red_wine <- read.csv('winequality-red.csv')
+white_wine <- read.csv('winequality-white.csv', sep = ';')
+
+# Mostra les primeres files dels data.frames
+head(red_wine)
+head(white_wine)
+```
+
+```{r}
+# Comprova les dimensions dels data.frames
+dim(red_wine)
+dim(white_wine)
+
+# Comprova l'estructura dels data.frames
+str(red_wine)
+str(white_wine)
+```
+
+```{r}
+# Resum de les dades dels data.frames
+summary(red_wine)
+summary(white_wine)
+```
+
+# 2. Integració i selecció de les dades d'interès
+
+```{r}
+# Afegeix la columna type als data.frames amb el tipus corresponent de vi 
+# (red o white)
+red_wine$type <- 'red'
+white_wine$type <- 'white'
+```
+
+```{r}
+# Combina els dos data.frames
+wine <- rbind(red_wine, white_wine)
+```
+
+```{r}
+# Estructura i resum del data.frame integrat
+str(wine)
+summary(wine)
+```
+
+```{r}
+# Canvia la variable type a factor
+wine$type <- as.factor(wine$type)
+str(wine)
+```
+
+
+# 3. Neteja de les dades
+
+## 3.1. Comprovació de valors buits o nuls
+
+```{r}
+# Comprova si hi ha valors nuls
+colSums(is.na(wine))
+
+# Comprova si hi ha valors buits
+colSums(wine=="")
+```
+
+No hi ha valors NA ni valors buits.
+
+```{r}
+# Comprova si hi ha valors 0
+colSums(wine==0)
+```
+
+A la columna citric.acid hi ha un total de 151 valors iguals a 0, però tenint en compte la resta de valors de la columna, sembla que aquest valor és vàlid en aquest context.
+
+## 3.2. Identificació i tractament de valors extrems
+
+```{r}
+# Variable amb el nom de les diferents columnes
+cols <- colnames(wine)[1:12]
+
+# Crea boxplots per als vins de tipus 'red' i 'white' per a cada variable
+for (i in cols){
+  boxplot(wine[,i] ~ type, data=wine, ylab=i, main=i)
+}
+```
+
+Veiem que en totes les variables mitjançant el mètode boxplot es detecten diversos outliers. Tot i això, aquests no estan exssesivament allunyats, cosa que fa pensar que es tracta de valors vàlids i no erronis.
+Tot i això, visualment es detecten alguns valors que sí que estan molt allunyats de la resta, i s'analitzaran més profundament a continuació.
+
+### fixed.acidity
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'white'), names(wine)]$fixed.acidity)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$fixed.acidity == 14.2)
+
+wine[out_row,]
+```
+
+### volatile.acidity
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'red'), names(wine)]$volatile.acidity)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$volatile.acidity == 1.580)
+
+wine[out_row,]
+```
+
+### citric.acid
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'white'), names(wine)]$citric.acid)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$citric.acid == 1.66)
+
+wine[out_row,]
+```
+
+### residual.sugar
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'white'), names(wine)]$residual.sugar)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$residual.sugar == 65.80)
+
+wine[out_row,]
+```
+
+### chlorides
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'red'), names(wine)]$chlorides)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$chlorides >= 0.6)
+
+wine[out_row,]
+```
+
+### free.sulfur.dioxide
+
+```{r}
+# Mostra els valors detectats com a atípics
+#boxplot.stats(wine$free.sulfur.dioxide)$out
+boxplot.stats(wine[which(wine$type == 'white'), names(wine)]$free.sulfur.dioxide)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$free.sulfur.dioxide == 289)
+
+wine[out_row,]
+```
+
+### total.sulfur.dioxide
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'red'), names(wine)]$total.sulfur.dioxide)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine[which(wine$type == 'red'), names(wine)]$total.sulfur.dioxide >= 200)
+
+wine[out_row,]
+```
+
+### density
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'white'), names(wine)]$density)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$density == 1.03898)
+
+wine[out_row,]
+```
+
+### sulphates
+
+```{r}
+# Mostra els valors detectats com a atípics
+boxplot.stats(wine[which(wine$type == 'red'), names(wine)]$sulphates)$out
+```
+
+```{r}
+# Mostra la fila amb el valor atípic
+out_row <- which(wine$sulphates >= 1.9)
+
+wine[out_row,]
+```
+
+Aquests valors, tot i que no tenen per què ser no vàlids, representen uns vins amb unes caracterítiques molt diferents a les de la resta del conjunt de dades, per tant, com que són pocs casos s'ha decidit eliminar-los del dataframe per evitar que impactin negativament en l'etapa de l'anàlisi.
+
+```{r}
+# Elimina les files amb valors extrems
+wine <- wine[-c(3126, 1300, 2345, 4381, 152, 259, 6346, 1080, 1082, 87, 92, 93),]
+```
+
+
+# 4. Anàlisi de les dades
+
+## 4.1. Selecció dels grups de dades que es volen analitzar/comparar
+
+S'explora la variable dependent quality, per veure si està equilibrada.
+
+```{r}
+# Visualitza la freqüència de les puntuacions de qualitat
+ggplot(wine, aes(x = reorder(quality, quality, function(x) length(x)))) + geom_bar() + xlab("quality") + ylab("Freqüència") + coord_flip()
+```
+
+```{r}
+# Visualitza la freqüència de la qualitat segons el tipus de vi
+ggplot() + geom_bar(data = wine, aes(x = quality, color = type)) + ylab("Freqüència")
+```
+
+Hi ha molts vins amb valoracions intermedies, però molt pocs amb valoracions molt altes o molt baixes, així que s'ha decidit eliminar els vins amb puntuacions de 9 i 3 degut a la seva poca presencia.
+
+```{r}
+# Mostra el nombre de vins amb qualitat 9 o 3
+sum(wine$quality == 9)
+sum(wine$quality == 3)
+```
+
+```{r}
+# Elimina les files amb qualitat 9
+wine <- wine[-c(which(wine$quality == 9)),]
+# Elimina les files amb qualitat 3
+wine <- wine[-c(which(wine$quality == 3)),]
+```
+
+### Correlació
+
+```{r}
+# Calcula la correlació i ho visualitza en un gràfic
+wine_corr <- cor(wine[,c(1:12)])
+corrplot(wine_corr, method='circle', type='upper', tl.cex=0.7)
+```
+
+```{r}
+# Elimina la columna no rellevant free.sulfur.dioxide
+wine <- wine[-6]
+
+# Mostra com ha quedat el nou data.frame
+str(wine)
+```
+
+El data.frame resultant consta de 6.451 observacions i 12 variables. Les 10 primeres són les variables independents, i les dues últimes són les variables independents. Els grups que es volen comparar són els dels vins "red" o "white", de la variable type a partir de less caracterítiques fisicoquímiques dels vins, així que la variable quality no es tindrà en compte.
+
+## 4.2.	Comprovació de la normalitat i homogeneïtat de la variància.
+
+```{r}
+# Variable amb el nom de les diferents columnes
+cols <- colnames(wine)[1:10]
+
+# Creació d'una quadricula de 2 files i 3 columnes per als gràfics
+par(mfrow=c(2,3))
+
+# Inspecció visual mitjançant plots Q-Q per a cada variable
+for (i in cols){
+  qqnorm(wine[,i], main=i)
+  qqline(wine[,i], col='red')
+}
+```
+
+Es pot observar que els punts no coincideixen perfectament amb les linies, això significa que les variables no segueixen uns distribució normal. A continuació s'analitza més profundament cada variable.
+
+### Variable fixed.acidity
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$fixed.acidity, 
+          main = 'Gràfic de densitat de fixed.acidity',
+          xlab = 'fixed.acidity')
+```
+
+Per a fer els tests de normalitat de Shapiro-Wilk la mida de la mostra ha de ser entre 3 i 5000 així que agafarem una mostra aleatòria de 5000 observacions del dataframe.
+
+```{r}
+set.seed(10)
+
+# Crea una mostra aleatòria de 5000 observacions
+index <- sample(1:nrow(wine), 5000)
+wine_sample <- wine[index,]
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$fixed.acidity)
+```
+
+```{r}
+# Crea subsets diferenciant entre vins "red" i "white"
+wine.red <- subset(wine, type == 'red')
+wine.white <- subset(wine, type == 'white')
+
+# Comprova si les variàncies són iguals
+var.test(wine.red$fixed.acidity, wine.white$fixed.acidity)
+```
+
+### Variable volatile.acidity
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$volatile.acidity, 
+          main = 'Gràfic de densitat de volatile.acidity',
+          xlab = 'volatile.acidity')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$volatile.acidity)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$volatile.acidity, wine.white$volatile.acidity)
+```
+
+
+### Variable citric.acid
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$citric.acid, 
+          main = 'Gràfic de densitat de citric.acid',
+          xlab = 'citric.acid')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$citric.acid)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$citric.acid, wine.white$citric.acid)
+```
+
+### Variable residual.sugar
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$residual.sugar, 
+          main = 'Gràfic de densitat de residual.sugar',
+          xlab = 'residual.sugar')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$residual.sugar)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$residual.sugar, wine.white$residual.sugar)
+```
+
+### Variable chlorides
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$chlorides, 
+          main = 'Gràfic de densitat de chlorides',
+          xlab = 'chlorides')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$chlorides)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$chlorides, wine.white$chlorides)
+```
+
+### Variable total.sulfur.dioxide
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$total.sulfur.dioxide, 
+          main = 'Gràfic de densitat de total.sulfur.dioxide',
+          xlab = 'total.sulfur.dioxide')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$total.sulfur.dioxide)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$total.sulfur.dioxide, wine.white$total.sulfur.dioxide)
+```
+
+### Variable density
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$density, 
+          main = 'Gràfic de densitat de density',
+          xlab = 'density')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$density)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$density, wine.white$density)
+```
+
+### Variable pH
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$pH, 
+          main = 'Gràfic de densitat de pH',
+          xlab = 'pH')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$pH)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$pH, wine.white$pH)
+```
+
+### Variable sulphates
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$sulphates, 
+          main = 'Gràfic de densitat de sulphates',
+          xlab = 'sulphates')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$sulphates)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$sulphates, wine.white$sulphates)
+```
+
+### Variable alcohol
+
+```{r}
+# Inspecció visual mitjançant un plot de densitat
+ggdensity(wine$alcohol, 
+          main = 'Gràfic de densitat de alcohol',
+          xlab = 'alcohol')
+```
+
+```{r}
+# Test de normalitat de Shapiro-Wilk
+shapiro.test(wine_sample$alcohol)
+```
+
+```{r}
+# Comprova si les variàncies són iguals
+var.test(wine.red$alcohol, wine.white$alcohol)
+```
+
+El p-value en el test de normalitat de Shapiro-Wilk és inferior a 0.05 en totes les variables cosa que implica que la distribució d'aquestes és significativament diferent de la distribució normal, i per tant no podem assumir-ne la normalitat.
+
+Tot i això, el Teorema del Límit Central diu que el contrast d’hipòtesis sobre la mitjana d’una mostra s’aproxima a una distribució normal encara que la població original no segueixi una distribució normal, sempre que la mida de la mostra sigui suficientment gran (n>30). Com que la mostra té més de 30 observacions podem aplicar el TLC.
+
+Pel que fa al test per comprovar si les variancies de les variables són iguals o diferents entre els vins rosat i els blancs, la majoria dels p-valors són inferiors a 0.05 i, per tant, es refusa la hipòtesis nul·la de que la variable per als vins rosats i els blancs prové de distribucions amb la mateixa variància, amb l'excepció de la variable pH, que té un p-valor > 0.05.
+
+## 4.3. Aplicació de proves estadístiques per comparar els grups de dades.
+
+### Contrast d'hipòtesis
+
+Es farà un test sobre la mitjana de dues mostres de poblacions independents amb distribucions normals considerant que les variàncies són desconegudes i diferents (menys a la variable pH), que es realitza amb un estadístic de contrast que segueix una distribució t d’Student amb v graus de llibertat.
+
+- fixed.acidity
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (la fixed.acidity és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (la fixed.acidity és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$fixed.acidity, wine.white$fixed.acidity, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que la fixed.acidity entre els vins rosats és superior a la dels vins blancs.
+
+- volatile.acidity
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (la volatile.acidity és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (la volatile.acidity és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$volatile.acidity, wine.white$volatile.acidity, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que la volatile.acidity entre els vins rosats és superior a la dels vins blancs.
+
+- citric.acid
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (la citric.acid és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)<μ(white) (la citric.acid és inferior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$citric.acid, wine.white$citric.acid, alternative='less', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que la citric.acid entre els vins rosats és inferior a la dels vins blancs.
+
+- residual.sugar
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el residual.sugar és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)<μ(white) (el residual.sugar és inferior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$residual.sugar, wine.white$residual.sugar, alternative='less', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el residual.sugar entre els vins rosats és inferior a la dels vins blancs.
+
+- chlorides
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el chlorides és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (el chlorides és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$chlorides, wine.white$chlorides, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el chlorides entre els vins rosats és superior a la dels vins blancs.
+
+- total.sulfur.dioxide
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el total.sulfur.dioxide és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)<μ(white) (el total.sulfur.dioxide és inferior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$residual.sugar, wine.white$residual.sugar, alternative='less', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el total.sulfur.dioxide entre els vins rosats és inferior a la dels vins blancs.
+
+- density
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (la density és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (la density és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$density, wine.white$density, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que la density entre els vins rosats és superior a la dels vins blancs.
+
+- pH
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el pH és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (el pH és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$pH, wine.white$pH, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el pH entre els vins rosats és superior a la dels vins blancs.
+
+- sulphates
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el sulphates és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)>μ(white) (el sulphates és superior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$sulphates, wine.white$sulphates, alternative='greater', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el sulphates entre els vins rosats és superior a la dels vins blancs.
+
+- alcohol
+
+Hipòtesi nul·la, H0: μ(red)=μ(white) (el alcohol és igual entre els vins rosats que els blancs)
+
+Hipòtesi alternativa, H1: μ(red)<μ(white) (el alcohol és inferior entre els vins rosats)
+
+```{r}
+# Test de la t de Student
+t.test(wine.red$alcohol, wine.white$alcohol, alternative='less', var.equal=FALSE)
+```
+
+El p-valor és més petit que 0.05, per tant, refusem la hipòtesis nul·la, i podem concloure que amb un nivell de confiança del 95% que el alcohol entre els vins rosats és inferior a la dels vins blancs.
+
+Com s'ha vist hi ha diferències significatives entre les mitjanes de totes les variables independents per als grups de vins rosats i blancs.
+
+### Clustering
+
+```{r}
+# Subset sense les variables classe
+wine.x <- wine[,1:10]
+
+# Normalitza el dataframe, ja que està en diferents escales
+wine.norm <- as.data.frame(scale(wine.x))
+```
+
+Per saber quin és el nombre òptim de clústers en que s’han d’agrupar les dades es pot fer comprovant el valor de la silueta entre 1 i 10 clústers per exemple.
+
+
+```{r}
+# Mira com queda la silueta entre 1 i 10 clústers
+d <- daisy(wine.norm)
+resultats <- rep(0, 10)
+for (i in 2:10) {
+  wine.k        <- kmeans(wine.norm, i)
+  winecluster   <- wine.k$cluster
+  swc           <- silhouette(winecluster, d)
+  resultats[i]  <- mean(swc[,3])
+}
+
+# Ho mostra per pantalla visualment
+plot(2:10,resultats[2:10],type="o",col="blue",pch=0,xlab="Nombre de clústers",ylab="Silueta")
+```
+
+Sembla que el nombre de clústers que dóna una silueta més gran com es pot apreciar al gràfic és 2. És el valor esperat, ja que se sap que hi ha dos tipus de vins, els rosats i els blancs.
+
+```{r}
+set.seed(10)
+
+# Aplica l'algorisme k-means amb el número òptim de clústers, 2
+wine.k2 <- kmeans(wine.norm, 2)
+
+# Mida dels clústers
+wine.k2$size
+```
+
+```{r}
+# Vizualitza els clústers
+clusplot(wine.norm, wine.k2$cluster, color=TRUE, shade=TRUE, lines=0)
+```
+
+- Resultats
+
+```{r}
+# Comparació visual de com ha agrupat l'algorisme respecte als grups reals
+par(mfrow=c(1,2))
+plot(wine[c(2,3)], col=wine.k2$cluster)
+plot(wine[c(2,3)], col=wine$type)
+```
+```{r}
+# Comparació visual de com ha agrupat l'algorisme respecte als grups reals
+par(mfrow=c(1,2))
+plot(wine[c(6,2)], col=wine.k2$cluster)
+plot(wine[c(6,2)], col=wine$type)
+```
+
+```{r}
+# Comparació visual de com ha agrupat l'algorisme respecte als grups reals
+par(mfrow=c(1,2))
+plot(wine[c(7,4)], col=wine.k2$cluster)
+plot(wine[c(7,4)], col=wine$type)
+```
+
+```{r}
+# Comparació visual de com ha agrupat l'algorisme respecte als grups reals
+par(mfrow=c(1,2))
+plot(wine[c(5,8)], col=wine.k2$cluster)
+plot(wine[c(5,8)], col=wine$type)
+```
+
+```{r}
+# Taula amb els resultats de classificació del kmeans
+table(wine.k2$cluster,wine$type)
+```
+
+```{r}
+# Precisió del model
+(1559+4809)/(1559+4809+23+60)*100
+```
+
+```{r message=FALSE}
+library(caret)
+# També es pot observar amb la funció confusionMatrix
+t <- table(wine.k2$cluster,wine$type)
+rownames(t) <- c("red", "white")
+confusionMatrix(t)
+```
+
+### Regressió logística
+
+```{r}
+# Afegeix la variable type al data.frame normalitzat
+wine.norm$type <- wine$type
+str(wine.norm)
+```
+
+```{r}
+# Aplica la regressió logística
+fit.full <- glm(type ~ fixed.acidity + volatile.acidity + citric.acid 
+              + residual.sugar + chlorides + total.sulfur.dioxide 
+              + density + pH + sulphates + alcohol,
+              data=wine.norm, family=binomial())
+```
+
+```{r}
+# Mostra els resultats de la regressió
+summary(fit.full)
+```
+
+Segons la regressió logística, totes les variables seleccionades són significatives per a explicar la variable resposta type (p-valor < 0.05), amb l'excepció de la variable sulphates (p-valor = 0.17366).
+
+```{r}
+# Coeficients
+coef(fit.full)
+```
+
+Les variables que més contribueixen són density (-7.37) i residual.sugar (4.75).
+
+```{r message=FALSE}
+library(arm)
+# Mostra visualment els coeficients de les diferents variables
+coefplot(fit.full, xlim=c(-8,6))
+```
+
+```{r}
+# El fitxer final amb les dades normalitzades
+write.csv(wine.norm, "wine_norm.csv", row.names=FALSE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
