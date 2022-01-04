@@ -8,7 +8,7 @@ Els arxius que s'inclouen són els següents:
 - Pràctica 2.pdf (document amb les respostes de la pràctica)
 - carpeta codi
     - prac2.html (l'arxiu html generat a partir del codi)
-    - prac2.rmd (l'arxiu rmd amb el codi)
+    - prac2.Rmd (l'arxiu Rmd amb el codi)
 - carpeta dades_originals
     - winequality-red.csv
     - winequality-white.csv
